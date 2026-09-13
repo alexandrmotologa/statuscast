@@ -1,0 +1,24 @@
+services:
+  statuscast:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: statuscast
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-mock_bot_token_for_local_testing}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID:-@statuscast_updates}
+      - ADMIN_SECRET=${ADMIN_SECRET:-statuscast_dev_secret_change_in_prod}
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - DATABASE_PATH=/app/data/statuscast.sqlite
+      - MONITOR_INTERVAL_SECONDS=60
+    volumes:
+      - statuscast_data:/app/data
+
+volumes:
+  statuscast_data:

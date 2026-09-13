@@ -1,0 +1,29 @@
+{
+  "name": "statuscast",
+  "version": "1.0.0",
+  "description": "Telegram Mini App status page and in-place Telegram channel incident broadcaster",
+  "main": "server/dist/index.js",
+  "scripts": {
+    "install:all": "npm install --prefix server && npm install --prefix web",
+    "build:server": "npm run build --prefix server",
+    "build:web": "npm run build --prefix web",
+    "build": "npm run build:web && npm run build:server",
+    "test:server": "npm test --prefix server",
+    "test": "npm run test:server",
+    "start": "node server/dist/index.js",
+    "dev:server": "npm run dev --prefix server",
+    "dev:web": "npm run dev --prefix web"
+  },
+  "keywords": [
+    "telegram",
+    "telegram-mini-app",
+    "status-page",
+    "incident-management",
+    "uptime",
+    "fastify",
+    "grammy",
+    "react"
+  ],
+  "author": "Alexander Motologa",
+  "license": "MIT"
+}
