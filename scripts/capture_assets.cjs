@@ -99,12 +99,39 @@ async function capture() {
       await page.screenshot({ path: postMortemPath });
       await recordFrame(1200);
 
+      // Switch to Raw MD tab
+      const rawTabBtn = await page.$('button::-p-text(Raw MD)');
+      if (rawTabBtn) {
+        await rawTabBtn.click();
+        await sleep(600);
+        await recordFrame(800);
+
+        // Switch back to Formatted tab
+        const formattedTabBtn = await page.$('button::-p-text(Formatted)');
+        if (formattedTabBtn) {
+          await formattedTabBtn.click();
+          await sleep(500);
+        }
+      }
+
       // Close post mortem modal via aria-label or Close button
-      const closePmBtn = await page.$('button[aria-label="Close"], button::-p-text(Close)');
+      const closePmBtn = await page.$('button[aria-label="Close modal"], button[aria-label="Close"]');
       if (closePmBtn) {
         await closePmBtn.click();
         await sleep(500);
       }
+    }
+
+    // Scroll back to top of admin cockpit
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sleep(400);
+
+    // Click 1-tap status switch on Payment Processor to make it Online
+    const onlineBtns = await page.$$('button[title*="Operational"]');
+    if (onlineBtns && onlineBtns.length > 3) {
+      await onlineBtns[3].click();
+      await sleep(600);
+      await recordFrame(900);
     }
   }
 
@@ -112,10 +139,10 @@ async function capture() {
   const publicBtn = await page.$('button::-p-text(Public View)');
   if (publicBtn) {
     await publicBtn.click();
-    await sleep(600);
+    await sleep(700);
     await page.evaluate(() => window.scrollTo(0, 0));
     await sleep(400);
-    await recordFrame(800);
+    await recordFrame(1000);
   }
 
   await browser.close();

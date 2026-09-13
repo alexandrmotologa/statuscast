@@ -57,26 +57,28 @@ export const MaintenanceBanner: React.FC<Props> = ({ maintenances, components })
             }`}
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
                   <Wrench className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 shrink-0">
                       Scheduled Maintenance
                     </span>
-                    <span className="text-xs font-mono text-zinc-400 font-semibold flex items-center gap-1">
+                    <span className="text-xs font-mono text-zinc-400 font-semibold flex items-center gap-1 shrink-0">
                       <Clock className="w-3 h-3 text-blue-400" />
                       {countdown}
                     </span>
                   </div>
-                  <h3 className="text-base font-bold text-zinc-100 mt-1">{m.title}</h3>
+                  <h3 className="text-base font-bold text-zinc-100 mt-1 truncate" title={m.title}>
+                    {m.title}
+                  </h3>
                 </div>
               </div>
 
-              <div className="text-xs text-zinc-400 font-mono flex items-center gap-1 self-start sm:self-center bg-zinc-800/60 px-2.5 py-1 rounded-lg">
-                <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+              <div className="text-xs text-zinc-400 font-mono flex items-center gap-1.5 self-start sm:self-center bg-zinc-800/60 px-2.5 py-1 rounded-lg shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 <span>
                   {new Date(m.scheduledStart).toLocaleDateString([], {
                     month: 'short',

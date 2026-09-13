@@ -76,11 +76,11 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 md:p-5 transition-all hover:border-zinc-700/80">
       {/* Component Header */}
       <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold text-zinc-100">{component.name}</h3>
+        <div className="flex items-center gap-2 min-w-0">
+          <h3 className="text-base font-semibold text-zinc-100 truncate">{component.name}</h3>
           {component.pingUrl && (
             <span
-              className="inline-flex items-center text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded"
+              className="inline-flex items-center text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded shrink-0"
               title={`Automated HTTP monitoring enabled: ${component.pingUrl}`}
             >
               <Globe className="w-2.5 h-2.5 mr-1 text-emerald-400" />
@@ -89,7 +89,7 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <span className="text-xs font-mono text-zinc-400 hidden sm:inline">
             {component.uptimePercentage.toFixed(2)}%
           </span>
@@ -99,7 +99,7 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
 
       {/* 90-Day Segmented Pill Bar */}
       <div
-        className="relative flex items-end gap-[2px] h-9 w-full py-1"
+        className="relative flex items-end gap-[1px] sm:gap-[1.5px] h-9 w-full py-1 overflow-hidden rounded-sm"
         onMouseLeave={() => setHoveredDay(null)}
       >
         {daysToRender.map((day, idx) => (
@@ -110,7 +110,7 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
               setMousePos({ x: e.clientX, y: e.clientY });
             }}
             onClick={() => setHoveredDay(day)}
-            className={`flex-1 h-full rounded-[2px] transition-all duration-150 cursor-pointer ${getPillColor(
+            className={`flex-1 min-w-[1px] h-full rounded-[1px] sm:rounded-[2px] transition-all duration-150 cursor-pointer ${getPillColor(
               day
             )} ${hoveredDay === day ? 'scale-y-125 z-10 brightness-125' : 'opacity-90'}`}
           />
@@ -119,7 +119,7 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
         {/* Hover Tooltip */}
         {hoveredDay && hoveredDay.date !== 'N/A' && (
           <div
-            className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-full mb-3 rounded-lg border border-zinc-700 bg-zinc-950/95 p-2.5 shadow-2xl backdrop-blur-md text-xs"
+            className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-full mb-3 rounded-lg border border-zinc-700 bg-zinc-950/95 p-2.5 shadow-2xl backdrop-blur-md text-xs max-w-xs"
             style={{ left: mousePos.x, top: mousePos.y - 12 }}
           >
             <div className="font-semibold text-zinc-100">{hoveredDay.date}</div>
@@ -139,10 +139,10 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
       </div>
 
       {/* Bar Subtitle */}
-      <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono mt-2">
-        <span>90 days ago</span>
-        <div className="h-[1px] flex-1 mx-3 bg-zinc-800" />
-        <span>Today ({component.uptimePercentage.toFixed(2)}%)</span>
+      <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 font-mono mt-2">
+        <span className="shrink-0">90 days ago</span>
+        <div className="h-[1px] flex-1 mx-2 sm:mx-3 bg-zinc-800/80 min-w-[10px]" />
+        <span className="shrink-0 text-zinc-300">Today ({component.uptimePercentage.toFixed(2)}%)</span>
       </div>
 
       {/* 24-Hour Latency Sparkline */}

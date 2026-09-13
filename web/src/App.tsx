@@ -53,11 +53,13 @@ export function App() {
   const handleOpenAdmin = () => {
     hapticFeedback.impact('light');
     setViewMode('admin');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBackToPublic = () => {
     hapticFeedback.impact('light');
     setViewMode('public');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOpenSubscribe = () => {
@@ -70,18 +72,18 @@ export function App() {
       {/* Top Navigation Bar */}
       <header className="w-full border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
               <Shield className="w-4 h-4 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
                 <span>StatusCast</span>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50">
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50 shrink-0">
                   TMA
                 </span>
               </div>
-              <div className="text-[11px] text-zinc-400">
+              <div className="text-[11px] text-zinc-400 truncate max-w-[150px] sm:max-w-xs" title={data?.page.title || 'System Status'}>
                 {data?.page.title || 'System Status'}
               </div>
             </div>

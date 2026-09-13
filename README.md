@@ -37,6 +37,10 @@
 | :---: | :---: |
 | <img src="docs/images/admin-cockpit.png" width="460" alt="Admin Cockpit" /> | <img src="docs/images/post-mortem-modal.png" width="460" alt="Post-Mortem Report" /> |
 
+| Telegram Mini App Mobile Status (390px) | Mobile Admin Controls & Heartbeat Webhooks |
+| :---: | :---: |
+| <img src="docs/images/mobile-public.png" width="320" alt="Mobile Public Status" /> | <img src="docs/images/mobile-admin.png" width="320" alt="Mobile Admin Controls" /> |
+
 ---
 
 ## Brand Mascot: The Radar Osprey

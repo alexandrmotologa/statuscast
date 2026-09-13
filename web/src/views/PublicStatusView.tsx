@@ -52,12 +52,12 @@ export const PublicStatusView: React.FC<Props> = ({
       {/* Services List Grouped */}
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-zinc-400 truncate">
               System Components
             </h2>
-            <span className="text-[10px] text-zinc-500 font-mono">
-              ({data.components.length} Monitored)
+            <span className="text-[10px] text-zinc-500 font-mono shrink-0 whitespace-nowrap">
+              ({data.components.length})
             </span>
           </div>
 
@@ -98,16 +98,16 @@ export const PublicStatusView: React.FC<Props> = ({
       {/* Footer */}
       <div className="pt-8 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
         <div className="flex items-center gap-2">
-          <Shield className="w-4 h-4 text-emerald-400" />
+          <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>StatusCast Autonomous Status Engine</span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4">
           <button
             onClick={onOpenSubscribe}
             className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
-            <Bell className="w-3.5 h-3.5 text-emerald-400" />
+            <Bell className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Direct DM Alerts</span>
           </button>
 
@@ -119,13 +119,13 @@ export const PublicStatusView: React.FC<Props> = ({
               className="flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-colors"
             >
               <span>Broadcast Channel</span>
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 shrink-0" />
             </a>
           )}
 
           <button
             onClick={onOpenAdmin}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-white font-semibold border border-zinc-750 transition-all active:scale-95 shadow-sm shrink-0"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Admin Cockpit</span>

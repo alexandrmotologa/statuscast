@@ -7,6 +7,7 @@ import {
   Clock,
   Copy,
   FileText,
+  Key,
   Plus,
   Radio,
   Terminal,
@@ -193,57 +194,116 @@ export const AdminCockpitView: React.FC<Props> = ({
     }
   };
 
+  const statusOptions: {
+    id: ComponentStatus;
+    label: string;
+    full: string;
+    activeClass: string;
+    dotClass: string;
+  }[] = [
+    {
+      id: 'OPERATIONAL',
+      label: 'Online',
+      full: 'Operational (100% healthy)',
+      activeClass: 'bg-emerald-500 text-white border-emerald-400 shadow-sm shadow-emerald-500/25',
+      dotClass: 'bg-emerald-400',
+    },
+    {
+      id: 'DEGRADED',
+      label: 'Degrad.',
+      full: 'Degraded Performance',
+      activeClass: 'bg-amber-500 text-zinc-950 border-amber-400 shadow-sm shadow-amber-500/25 font-bold',
+      dotClass: 'bg-amber-400',
+    },
+    {
+      id: 'PARTIAL_OUTAGE',
+      label: 'Partial',
+      full: 'Partial Outage',
+      activeClass: 'bg-orange-500 text-white border-orange-400 shadow-sm shadow-orange-500/25',
+      dotClass: 'bg-orange-400',
+    },
+    {
+      id: 'MAJOR_OUTAGE',
+      label: 'Major',
+      full: 'Major Outage',
+      activeClass: 'bg-rose-500 text-white border-rose-400 shadow-sm shadow-rose-500/25',
+      dotClass: 'bg-rose-400',
+    },
+    {
+      id: 'MAINTENANCE',
+      label: 'Maint',
+      full: 'Under Maintenance',
+      activeClass: 'bg-blue-500 text-white border-blue-400 shadow-sm shadow-blue-500/25',
+      dotClass: 'bg-blue-400',
+    },
+  ];
+
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Cockpit Top Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBackToPublic}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-750 text-xs font-semibold text-zinc-300 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Public Status</span>
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>Admin Cockpit</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">
+      {/* Cockpit Top Bar - Clean Two-Tier Layout */}
+      <div className="space-y-3 border-b border-zinc-800 pb-5">
+        {/* Tier 1: Title and Primary Actions */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBackToPublic}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/90 hover:bg-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white transition-all active:scale-95 border border-zinc-750"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Public View</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white tracking-tight">Admin Cockpit</h1>
+              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-semibold border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 LIVE
               </span>
-            </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button
+              onClick={() => setIsComponentModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-all active:scale-95 shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Component</span>
+            </button>
+
+            <button
+              onClick={() => setIsIncidentModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/25 transition-all active:scale-95 shrink-0"
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Report Incident</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
-          <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs text-zinc-300 font-mono">
-            <Users className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{subscribersCount} DM Subscribers</span>
+        {/* Tier 2: Status & Access Control Strip */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80">
+          <div className="flex items-center gap-2 text-xs text-zinc-300 font-mono px-1">
+            <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Users className="w-3.5 h-3.5" />
+            </div>
+            <span>
+              <strong className="text-white font-semibold">{subscribersCount}</strong> Direct DM Subscribers
+            </span>
+            <span className="text-zinc-600 hidden md:inline">•</span>
+            <span className="text-zinc-400 text-[11px] hidden md:inline">Instant Telegram alerts active</span>
           </div>
 
-          <input
-            type="password"
-            placeholder="Admin Secret (if not owner)"
-            value={adminSecret}
-            onChange={(e) => onUpdateAdminSecret(e.target.value)}
-            className="w-full sm:w-48 px-3 py-1.5 text-xs rounded-xl bg-zinc-800/80 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono"
-          />
-
-          <button
-            onClick={() => setIsComponentModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Component</span>
-          </button>
-
-          <button
-            onClick={() => setIsIncidentModalOpen(true)}
-            className="flex items-center gap-1.5 shrink-0 px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 transition-all active:scale-95"
-          >
-            <AlertCircle className="w-4 h-4" />
-            <span>Report Incident</span>
-          </button>
+          <div className="relative flex items-center">
+            <Key className="w-3.5 h-3.5 text-zinc-500 absolute left-3 pointer-events-none" />
+            <input
+              type="password"
+              placeholder="Admin Secret Token"
+              value={adminSecret}
+              onChange={(e) => onUpdateAdminSecret(e.target.value)}
+              className="w-full sm:w-56 pl-8 pr-3 py-1.5 text-xs rounded-lg bg-zinc-950/80 border border-zinc-750 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
+              title="Admin Secret Token for authenticated operations"
+            />
+          </div>
         </div>
       </div>
 
@@ -257,68 +317,59 @@ export const AdminCockpitView: React.FC<Props> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {components.map((comp) => {
-            const statusOptions: ComponentStatus[] = [
-              'OPERATIONAL',
-              'DEGRADED',
-              'PARTIAL_OUTAGE',
-              'MAJOR_OUTAGE',
-              'MAINTENANCE',
-            ];
-
-            return (
-              <div
-                key={comp.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3 relative group"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-zinc-200 text-sm">{comp.name}</span>
-                    <span className="text-xs text-zinc-500 ml-2">({comp.groupName})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-zinc-400">
-                      {comp.uptimePercentage.toFixed(2)}%
-                    </span>
-                    <button
-                      onClick={() => handleDeleteComponentConfirm(comp.id, comp.name)}
-                      className="p-1 rounded text-zinc-500 hover:text-rose-400 transition-colors opacity-60 hover:opacity-100"
-                      title="Delete Component"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+          {components.map((comp) => (
+            <div
+              key={comp.id}
+              className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3 relative group transition-colors hover:border-zinc-700/80"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="font-semibold text-zinc-200 text-sm truncate block">
+                    {comp.name}
+                    <span className="text-xs font-normal text-zinc-500 ml-2">({comp.groupName})</span>
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                  {statusOptions.map((st) => {
-                    const isCurrent = comp.status === st;
-                    return (
-                      <button
-                        key={st}
-                        onClick={() => onUpdateComponent(comp.id, st)}
-                        className={`py-1.5 px-1 rounded-lg text-[10px] font-bold border transition-all ${
-                          isCurrent
-                            ? st === 'OPERATIONAL'
-                              ? 'bg-emerald-500 text-white border-emerald-500'
-                              : st === 'DEGRADED'
-                              ? 'bg-amber-500 text-black border-amber-500'
-                              : st === 'PARTIAL_OUTAGE'
-                              ? 'bg-orange-500 text-white border-orange-500'
-                              : st === 'MAJOR_OUTAGE'
-                              ? 'bg-rose-500 text-white border-rose-500'
-                              : 'bg-blue-500 text-white border-blue-500'
-                            : 'bg-zinc-800 border-zinc-700/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-750'
-                        }`}
-                      >
-                        {st.replace('_', ' ')}
-                      </button>
-                    );
-                  })}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-mono text-zinc-400">
+                    {comp.uptimePercentage.toFixed(2)}%
+                  </span>
+                  <button
+                    onClick={() => handleDeleteComponentConfirm(comp.id, comp.name)}
+                    className="p-1 rounded text-zinc-500 hover:text-rose-400 transition-colors opacity-60 hover:opacity-100"
+                    title="Delete Component"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-            );
-          })}
+
+              {/* 5-Button Status Switcher - High Precision, Unclipped */}
+              <div className="grid grid-cols-5 gap-1.5 p-1 bg-zinc-950/50 rounded-xl border border-zinc-800/80">
+                {statusOptions.map((opt) => {
+                  const isCurrent = comp.status === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => onUpdateComponent(comp.id, opt.id)}
+                      title={opt.full}
+                      className={`py-1.5 px-1 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 min-w-0 ${
+                        isCurrent
+                          ? opt.activeClass
+                          : 'bg-zinc-850/80 border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          isCurrent ? (opt.id === 'DEGRADED' ? 'bg-zinc-950' : 'bg-white') : opt.dotClass
+                        }`}
+                      />
+                      <span className="truncate">{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -337,16 +388,19 @@ export const AdminCockpitView: React.FC<Props> = ({
             {activeIncidents.map((incident) => (
               <div
                 key={incident.id}
-                className="rounded-xl border border-rose-500/30 bg-zinc-900/80 p-5 space-y-4 shadow-xl"
+                className="rounded-xl border border-rose-500/30 bg-zinc-900/80 p-4 sm:p-5 space-y-4 shadow-xl"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
-                  <div>
-                    <h3 className="font-bold text-zinc-100 text-base">{incident.title}</h3>
-                    <div className="text-xs text-zinc-400 mt-0.5">
-                      Severity: <span className="text-rose-400 font-semibold">{incident.severity}</span> | Status:{' '}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-zinc-100 text-base truncate">{incident.title}</h3>
+                    <div className="text-xs text-zinc-400 mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span>Severity:</span>
+                      <span className="text-rose-400 font-semibold">{incident.severity}</span>
+                      <span className="text-zinc-600">•</span>
+                      <span>Status:</span>
                       <span className="text-amber-400 font-semibold">{incident.status}</span>
                       {incident.channelMessageId && (
-                        <span className="ml-2 font-mono text-blue-400">
+                        <span className="font-mono text-blue-400">
                           (Telegram Msg #{incident.channelMessageId})
                         </span>
                       )}
@@ -355,10 +409,13 @@ export const AdminCockpitView: React.FC<Props> = ({
 
                   <button
                     onClick={() => handleResolve(incident.id)}
-                    className="flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                    className="flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 active:scale-95 transition-all shrink-0"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Mark as Resolved (Edits Channel)</span>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Mark as Resolved</span>
+                    <span className="hidden md:inline text-emerald-200 font-normal text-[11px]">
+                      (Edits Channel)
+                    </span>
                   </button>
                 </div>
 
@@ -366,7 +423,7 @@ export const AdminCockpitView: React.FC<Props> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-zinc-400 font-medium">
                     <span>Append In-Place Status Update:</span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       {(['IDENTIFIED', 'MONITORING'] as IncidentStatus[]).map((st) => (
                         <button
                           key={st}
@@ -374,10 +431,10 @@ export const AdminCockpitView: React.FC<Props> = ({
                           onClick={() =>
                             setUpdateStatuses((prev) => ({ ...prev, [incident.id]: st }))
                           }
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border transition-all ${
                             (updateStatuses[incident.id] || 'IDENTIFIED') === st
                               ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                              : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                              : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-zinc-200'
                           }`}
                         >
                           {st}
@@ -386,10 +443,10 @@ export const AdminCockpitView: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
-                      placeholder="e.g. Traffic rerouted. Latency dropping..."
+                      placeholder="e.g. Traffic rerouted to secondary cluster. Latency dropping..."
                       value={updateMessages[incident.id] || ''}
                       onChange={(e) =>
                         setUpdateMessages((prev) => ({
@@ -397,12 +454,12 @@ export const AdminCockpitView: React.FC<Props> = ({
                           [incident.id]: e.target.value,
                         }))
                       }
-                      className="flex-1 px-3 py-2 text-xs rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-emerald-500"
+                      className="flex-1 min-w-0 px-3 py-2 text-xs rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-emerald-500 transition-colors"
                     />
                     <button
                       onClick={() => handlePostUpdate(incident.id)}
                       disabled={!updateMessages[incident.id]?.trim()}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 transition-all"
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 transition-all shrink-0 shadow-sm shadow-blue-600/20"
                     >
                       Post Update
                     </button>
@@ -424,17 +481,17 @@ export const AdminCockpitView: React.FC<Props> = ({
             {resolvedIncidents.map((inc) => (
               <div
                 key={inc.id}
-                className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs hover:border-zinc-700/80 transition-colors"
               >
-                <div>
-                  <span className="font-semibold text-zinc-200">{inc.title}</span>
+                <div className="min-w-0">
+                  <span className="font-semibold text-zinc-200 text-sm sm:text-xs truncate block">{inc.title}</span>
                   <div className="text-[11px] text-zinc-500 mt-0.5">
                     Resolved at {new Date(inc.resolvedAt || inc.createdAt).toLocaleDateString()}
                   </div>
                 </div>
                 <button
                   onClick={() => handleOpenPostMortem(inc)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 font-medium transition-colors"
+                  className="flex items-center gap-1.5 self-start sm:self-auto px-3 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 font-medium transition-colors shrink-0"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Generate Post-Mortem</span>
@@ -458,12 +515,12 @@ export const AdminCockpitView: React.FC<Props> = ({
             {maintenances.map((m) => (
               <div
                 key={m.id}
-                className="flex items-center justify-between p-3.5 rounded-xl bg-blue-950/20 border border-blue-500/30 text-xs"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 rounded-xl bg-blue-950/20 border border-blue-500/30 text-xs"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-zinc-200">{m.title}</span>
-                    <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-zinc-200 truncate">{m.title}</span>
+                    <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 shrink-0">
                       {m.status}
                     </span>
                   </div>
@@ -471,7 +528,7 @@ export const AdminCockpitView: React.FC<Props> = ({
                     Start: {new Date(m.scheduledStart).toUTCString()}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {m.status === 'SCHEDULED' && (
                     <button
                       onClick={() => onUpdateMaintenance(m.id, 'IN_PROGRESS')}
@@ -583,18 +640,18 @@ export const AdminCockpitView: React.FC<Props> = ({
             {components.map((comp) => (
               <div
                 key={comp.id}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950/70 border border-zinc-800/80 text-xs font-mono"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-950/70 border border-zinc-800/80 text-xs font-mono"
               >
-                <div className="flex items-center gap-2 truncate mr-3">
+                <div className="flex items-center gap-2 min-w-0 mr-1">
                   <Terminal className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                  <span className="text-zinc-300 font-semibold">{comp.name}:</span>
+                  <span className="text-zinc-300 font-semibold shrink-0">{comp.name}:</span>
                   <span className="text-zinc-400 truncate">
                     POST /api/heartbeat/{comp.id}?token={comp.heartbeatToken || 'token'}
                   </span>
                 </div>
                 <button
                   onClick={() => copyHeartbeatCurl(comp.id, comp.heartbeatToken)}
-                  className="flex items-center gap-1 shrink-0 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] transition-colors"
+                  className="flex items-center gap-1 self-start sm:self-auto shrink-0 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] transition-colors"
                 >
                   <Copy className="w-3 h-3" />
                   <span>{copiedToken === comp.id ? 'Copied!' : 'Copy cURL'}</span>
