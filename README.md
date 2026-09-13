@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  StatusCast replaces third-party status page subscriptions with a self-hosted Telegram Mini App and an automated incident broadcaster for Telegram channels. When incidents occur, updates and resolutions edit the original channel announcement in place, keeping public feeds clean while notifying subscribers directly.
+  StatusCast is a self-hosted Telegram Mini App and incident broadcaster for Telegram channels. When incidents occur, updates and resolutions edit the original channel announcement in place, keeping public feeds clean while notifying subscribers directly.
 </p>
 
 <p align="center">
@@ -27,7 +27,7 @@
 
 ---
 
-## Visual Showcase
+## Screenshots
 
 | Public Status Page (Latency Sparklines & Maintenance) | Direct Bot DM Alerts Modal |
 | :---: | :---: |
@@ -45,14 +45,10 @@
 
 ## Brand Mascot: The Radar Osprey
 
-StatusCast is represented by the **Radar Osprey** (*Pandion Observator*). 
-
-In nature, the osprey maintains an unblinking gaze over vast expanses of water, detecting subtle movement beneath turbulent surfaces without losing flight stability. StatusCast brings that same relentless vigilance to modern infrastructure: tracking millisecond latency shifts 24/7, catching silent regressions, and broadcasting coordinated telemetry the instant degradation occurs.
-
-The emblem follows disciplined Swiss origami geometry:
-- **Electric Cyan Optics (`#00f5ff`)**: Active ping probes, real-time response telemetry, and instant Telegram alert delivery.
-- **Obsidian & Slate Facets (`#0b0f19` — `#475569`)**: Structural resilience backed by zero-dependency native SQLite WAL persistence.
-- **Titanium Amber Hook (`#fbbf24`)**: Instant incident triage and swift root-cause resolution.
+StatusCast is represented by the **Radar Osprey** (*Pandion Observator*), designed with geometric origami lines:
+- **Electric Cyan Optics (`#00f5ff`)**: Active probes and instant Telegram alert delivery.
+- **Obsidian and Slate Facets (`#0b0f19` to `#475569`)**: Native SQLite WAL persistence.
+- **Titanium Amber Hook (`#fbbf24`)**: Incident triage and root-cause notifications.
 
 ---
 
@@ -60,13 +56,13 @@ The emblem follows disciplined Swiss origami geometry:
 
 - **Telegram Mini App Status Interface:** Displays overall system health, 90-day segmented historical uptime bars per component, and chronological incident logs.
 - **In-Place Channel Broadcaster:** Sends an alert to your Telegram channel when an incident starts. Updates and resolution notes edit the original message in place, keeping your channel feed clean.
-- **Direct Bot DM Alerts & Subscriber System:** Visitors can subscribe directly via Telegram bot to receive instant push alerts for critical outages and maintenance notifications.
+- **Direct Bot DM Alerts:** Visitors can subscribe directly via Telegram bot to receive push alerts for critical outages and maintenance notifications.
 - **24-Hour Latency Sparklines:** Visualizes real-time response time curves and tracks average, minimum, and maximum response times per service.
 - **Scheduled Maintenance Windows:** Advance notice banners with live countdown timers, component tagging, and automated Telegram channel notices.
 - **Component Management Cockpit:** Admin interface to add, edit, or remove services with custom health check endpoints and heartbeat keepalive tokens.
 - **Automated Incident Post-Mortems:** Generates structured Markdown incident review documents complete with timelines, customer impact summaries, and follow-up checklists.
 - **Automated Monitoring & Heartbeats:** Built-in background health checks for HTTP endpoints and a webhook receiver (`POST /api/heartbeat/:componentId`) for cron pings.
-- **Standalone Execution:** Uses Telegram long polling (`getUpdates`). Runs on a local machine without public domains, HTTPS tunnels, or paid hosting.
+- **Standalone Execution:** Uses Telegram long polling (`getUpdates`). Runs on a local machine without public domains, HTTPS tunnels, or external proxy requirements.
 - **Demo Mode:** Pre-seeds sample services (API Gateway, Web Application, Database Cluster, Payment Processor), 90-day historical metrics, latency samples, and an active incident card.
 
 ## Architecture
@@ -114,7 +110,7 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-If you do not have a Telegram Bot token yet, keep `DEMO_MODE=true` and default mock settings. The application runs fully in mock mode, emulating Telegram WebApp interactions and logging broadcast messages to the console and admin cockpit.
+If you do not have a Telegram Bot token yet, keep `DEMO_MODE=true` and default mock settings. The application runs in mock mode, emulating Telegram WebApp interactions and logging broadcast messages to the console and admin cockpit.
 
 To connect live Telegram services:
 1. Open `@BotFather` in Telegram and run `/newbot` to generate a token.
@@ -156,26 +152,26 @@ Access the status page at `http://localhost:8080`.
 
 ## API Endpoints
 
-### Public
-- `GET /api/status/:pageId` — Component health, 90-day daily uptime data, 24h latency history, and incident logs.
-- `GET /api/status/:pageId/badge` — SVG status badge for GitHub READMEs.
-- `POST /api/subscriptions/subscribe` — Subscribe a Telegram user to direct alert notifications.
-- `POST /api/subscriptions/unsubscribe` — Remove user from direct alert notifications.
-- `GET /api/subscriptions/:pageId/status` — Check if a user is subscribed.
-- `GET /api/incidents/:id/post-mortem` — Retrieve generated markdown post-mortem report for an incident.
-- `GET /health` — Service readiness probe.
+### Public Endpoints
+- `GET /api/status/:pageId`: Component health, 90-day daily uptime data, 24h latency history, and incident logs.
+- `GET /api/status/:pageId/badge`: SVG status badge for GitHub READMEs.
+- `POST /api/subscriptions/subscribe`: Subscribe a Telegram user to direct alert notifications.
+- `POST /api/subscriptions/unsubscribe`: Remove user from direct alert notifications.
+- `GET /api/subscriptions/:pageId/status`: Check if a user is subscribed.
+- `GET /api/incidents/:id/post-mortem`: Retrieve generated markdown post-mortem report for an incident.
+- `GET /health`: Service readiness probe.
 
-### Admin (Requires `X-Admin-Secret` header or Telegram WebApp authentication)
-- `POST /api/components` — Create a new monitored service component.
-- `PUT /api/components/:id` — Update component operational status and metadata.
-- `DELETE /api/components/:id` — Delete a monitored component.
-- `POST /api/incidents` — Create an incident and broadcast to the Telegram channel.
-- `PATCH /api/incidents/:id` — Append an update or mark an incident as resolved (edits channel post in place).
-- `POST /api/maintenance` — Schedule a maintenance window and notify channel/subscribers.
-- `PATCH /api/maintenance/:id` — Update maintenance status (SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED).
+### Admin Endpoints (Requires `X-Admin-Secret` header or Telegram WebApp authentication)
+- `POST /api/components`: Create a new monitored service component.
+- `PUT /api/components/:id`: Update component operational status and metadata.
+- `DELETE /api/components/:id`: Delete a monitored component.
+- `POST /api/incidents`: Create an incident and broadcast to the Telegram channel.
+- `PATCH /api/incidents/:id`: Append an update or mark an incident as resolved (edits channel post in place).
+- `POST /api/maintenance`: Schedule a maintenance window and notify channel/subscribers.
+- `PATCH /api/maintenance/:id`: Update maintenance status (SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED).
 
-### Heartbeat
-- `POST /api/heartbeat/:componentId` — Accept external keepalive pings from cron jobs or servers.
+### Heartbeat Endpoints
+- `POST /api/heartbeat/:componentId`: Accept external keepalive pings from cron jobs or servers.
 
 Detailed endpoint documentation is in [docs/api-reference.md](docs/api-reference.md).
 
@@ -212,6 +208,10 @@ Run backend tests:
 ```bash
 npm test
 ```
+
+## Contributing
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow and code style guidelines.
 
 ## License
 
