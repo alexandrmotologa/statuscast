@@ -2,12 +2,21 @@ import React, { useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   CheckCircle2,
+  Clock,
   Copy,
+  FileText,
+  Plus,
   Radio,
   Terminal,
+  Trash2,
+  Users,
+  Wrench,
 } from 'lucide-react';
+import { CreateComponentModal } from '../components/CreateComponentModal.js';
 import { CreateIncidentModal } from '../components/CreateIncidentModal.js';
+import { PostMortemModal } from '../components/PostMortemModal.js';
 import {
   BroadcastLogItem,
   Component,
@@ -15,15 +24,26 @@ import {
   Incident,
   IncidentSeverity,
   IncidentStatus,
+  MaintenanceStatus,
+  MaintenanceWindow,
 } from '../types.js';
 
 interface Props {
   components: Component[];
   incidents: Incident[];
+  maintenances?: MaintenanceWindow[];
   broadcastLogs: BroadcastLogItem[];
+  subscribersCount?: number;
   adminSecret: string;
   onUpdateAdminSecret: (secret: string) => void;
   onUpdateComponent: (id: string, status: ComponentStatus) => Promise<any>;
+  onCreateComponent: (params: {
+    name: string;
+    groupName: string;
+    pingUrl?: string;
+    heartbeatToken?: string;
+  }) => Promise<any>;
+  onDeleteComponent: (id: string) => Promise<any>;
   onCreateIncident: (params: {
     title: string;
     severity: IncidentSeverity;
@@ -34,26 +54,58 @@ interface Props {
     id: string,
     params: { status: IncidentStatus; message?: string; resolved?: boolean }
   ) => Promise<any>;
+  onScheduleMaintenance: (params: {
+    title: string;
+    description: string;
+    scheduledStart: number;
+    scheduledEnd: number;
+    affectedComponentIds?: string[];
+  }) => Promise<any>;
+  onUpdateMaintenance: (id: string, status: MaintenanceStatus) => Promise<any>;
+  onFetchPostMortem: (id: string) => Promise<{ markdown: string }>;
   onBackToPublic: () => void;
 }
 
 export const AdminCockpitView: React.FC<Props> = ({
   components,
   incidents,
+  maintenances = [],
   broadcastLogs,
+  subscribersCount = 0,
   adminSecret,
   onUpdateAdminSecret,
   onUpdateComponent,
+  onCreateComponent,
+  onDeleteComponent,
   onCreateIncident,
   onUpdateIncident,
+  onScheduleMaintenance,
+  onUpdateMaintenance,
+  onFetchPostMortem,
   onBackToPublic,
 }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [isComponentModalOpen, setIsComponentModalOpen] = useState(false);
+  const [postMortemModalData, setPostMortemModalData] = useState<{
+    isOpen: boolean;
+    title: string;
+    markdown: string;
+  }>({ isOpen: false, title: '', markdown: '' });
+
+  // Maintenance form states
+  const [maintTitle, setMaintTitle] = useState('');
+  const [maintDesc, setMaintDesc] = useState('');
+  const [maintStartHours, setMaintStartHours] = useState('24');
+  const [maintDurationHours, setMaintDurationHours] = useState('2');
+  const [maintAffectedIds, setMaintAffectedIds] = useState<string[]>([]);
+  const [isSchedulingMaint, setIsSchedulingMaint] = useState(false);
+
   const [updateMessages, setUpdateMessages] = useState<Record<string, string>>({});
   const [updateStatuses, setUpdateStatuses] = useState<Record<string, IncidentStatus>>({});
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const activeIncidents = incidents.filter((i) => i.status !== 'RESOLVED');
+  const resolvedIncidents = incidents.filter((i) => i.status === 'RESOLVED');
 
   const handlePostUpdate = async (incidentId: string) => {
     const message = updateMessages[incidentId];
@@ -83,11 +135,62 @@ export const AdminCockpitView: React.FC<Props> = ({
     }
   };
 
+  const handleOpenPostMortem = async (incident: Incident) => {
+    try {
+      const res = await onFetchPostMortem(incident.id);
+      setPostMortemModalData({
+        isOpen: true,
+        title: incident.title,
+        markdown: res.markdown,
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to fetch post-mortem');
+    }
+  };
+
+  const handleScheduleMaintenanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!maintTitle.trim()) return;
+
+    try {
+      setIsSchedulingMaint(true);
+      const now = Date.now();
+      const start = now + parseFloat(maintStartHours) * 3600000;
+      const end = start + parseFloat(maintDurationHours) * 3600000;
+
+      await onScheduleMaintenance({
+        title: maintTitle,
+        description: maintDesc,
+        scheduledStart: start,
+        scheduledEnd: end,
+        affectedComponentIds: maintAffectedIds,
+      });
+
+      setMaintTitle('');
+      setMaintDesc('');
+      setMaintAffectedIds([]);
+      alert('Maintenance window scheduled & broadcast to Telegram!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to schedule maintenance');
+    } finally {
+      setIsSchedulingMaint(false);
+    }
+  };
+
   const copyHeartbeatCurl = (compId: string, token?: string) => {
     const curl = `curl -X POST "${window.location.origin}/api/heartbeat/${compId}?token=${token || 'demo_token'}"`;
     navigator.clipboard.writeText(curl);
     setCopiedToken(compId);
     setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const handleDeleteComponentConfirm = async (compId: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete component "${name}"?`)) return;
+    try {
+      await onDeleteComponent(compId);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete component');
+    }
   };
 
   return (
@@ -112,17 +215,30 @@ export const AdminCockpitView: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+          <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs text-zinc-300 font-mono">
+            <Users className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{subscribersCount} DM Subscribers</span>
+          </div>
+
           <input
             type="password"
             placeholder="Admin Secret (if not owner)"
             value={adminSecret}
             onChange={(e) => onUpdateAdminSecret(e.target.value)}
-            className="w-full sm:w-56 px-3 py-1.5 text-xs rounded-xl bg-zinc-800/80 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono"
+            className="w-full sm:w-48 px-3 py-1.5 text-xs rounded-xl bg-zinc-800/80 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono"
           />
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsComponentModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Component</span>
+          </button>
+
+          <button
+            onClick={() => setIsIncidentModalOpen(true)}
             className="flex items-center gap-1.5 shrink-0 px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 transition-all active:scale-95"
           >
             <AlertCircle className="w-4 h-4" />
@@ -131,13 +247,13 @@ export const AdminCockpitView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 1. Component Status Toggles */}
+      {/* 1. Component Status Toggles & CRUD */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-            Component State Overrides
+            Monitored Components ({components.length})
           </h2>
-          <span className="text-xs text-zinc-500">1-Tap instant switch</span>
+          <span className="text-xs text-zinc-500">1-Tap instant status switch</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -153,13 +269,25 @@ export const AdminCockpitView: React.FC<Props> = ({
             return (
               <div
                 key={comp.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3"
+                className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3 relative group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-zinc-200 text-sm">{comp.name}</span>
-                  <span className="text-xs font-mono text-zinc-400">
-                    {comp.uptimePercentage.toFixed(2)}%
-                  </span>
+                  <div>
+                    <span className="font-semibold text-zinc-200 text-sm">{comp.name}</span>
+                    <span className="text-xs text-zinc-500 ml-2">({comp.groupName})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-zinc-400">
+                      {comp.uptimePercentage.toFixed(2)}%
+                    </span>
+                    <button
+                      onClick={() => handleDeleteComponentConfirm(comp.id, comp.name)}
+                      className="p-1 rounded text-zinc-500 hover:text-rose-400 transition-colors opacity-60 hover:opacity-100"
+                      title="Delete Component"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -286,7 +414,159 @@ export const AdminCockpitView: React.FC<Props> = ({
         )}
       </div>
 
-      {/* 3. Heartbeat & Cron Keepalive Webhook Guide */}
+      {/* 3. Resolved Incidents & Post-Mortem Generator */}
+      {resolvedIncidents.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+            Resolved Incidents & Post-Mortem Reports
+          </h2>
+          <div className="space-y-2">
+            {resolvedIncidents.map((inc) => (
+              <div
+                key={inc.id}
+                className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-xs"
+              >
+                <div>
+                  <span className="font-semibold text-zinc-200">{inc.title}</span>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">
+                    Resolved at {new Date(inc.resolvedAt || inc.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleOpenPostMortem(inc)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 font-medium transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Generate Post-Mortem</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 4. Scheduled Maintenance Manager */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-blue-400" />
+          <span>Schedule Maintenance Window</span>
+        </h2>
+
+        {/* Existing Maintenances */}
+        {maintenances.length > 0 && (
+          <div className="space-y-2">
+            {maintenances.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between p-3.5 rounded-xl bg-blue-950/20 border border-blue-500/30 text-xs"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-zinc-200">{m.title}</span>
+                    <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300">
+                      {m.status}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-zinc-400 mt-1">
+                    Start: {new Date(m.scheduledStart).toUTCString()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {m.status === 'SCHEDULED' && (
+                    <button
+                      onClick={() => onUpdateMaintenance(m.id, 'IN_PROGRESS')}
+                      className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px]"
+                    >
+                      Start Now
+                    </button>
+                  )}
+                  {m.status === 'IN_PROGRESS' && (
+                    <button
+                      onClick={() => onUpdateMaintenance(m.id, 'COMPLETED')}
+                      className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px]"
+                    >
+                      Complete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Schedule Form */}
+        <form
+          onSubmit={handleScheduleMaintenanceSubmit}
+          className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3 text-xs"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-zinc-400 font-semibold mb-1">Title *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Database Cluster Migration"
+                value={maintTitle}
+                onChange={(e) => setMaintTitle(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-zinc-400 font-semibold mb-1">Starts In (Hours)</label>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.5"
+                  value={maintStartHours}
+                  onChange={(e) => setMaintStartHours(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100 focus:outline-none focus:border-blue-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-zinc-400 font-semibold mb-1">Duration (Hours)</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={maintDurationHours}
+                  onChange={(e) => setMaintDurationHours(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100 focus:outline-none focus:border-blue-500 font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-zinc-400 font-semibold mb-1">Description</label>
+            <textarea
+              rows={2}
+              placeholder="Expected scope of work and impact..."
+              value={maintDesc}
+              onChange={(e) => setMaintDesc(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100 focus:outline-none focus:border-blue-500 resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+              <span>Will broadcast announcement card to Telegram channel</span>
+            </div>
+            <button
+              type="submit"
+              disabled={isSchedulingMaint || !maintTitle.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white active:scale-95 disabled:opacity-50 transition-all shadow-md shadow-blue-600/20"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>{isSchedulingMaint ? 'Scheduling...' : 'Schedule & Broadcast'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 5. Heartbeat & Webhooks Guide */}
       <div className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
           <Radio className="w-4 h-4 text-emerald-400" />
@@ -325,7 +605,7 @@ export const AdminCockpitView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 4. Telegram Channel Broadcast Audit Trail */}
+      {/* 6. Telegram Channel Broadcast Audit Trail */}
       <div className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
           Telegram Channel Broadcast Logs
@@ -350,6 +630,10 @@ export const AdminCockpitView: React.FC<Props> = ({
                           ? 'bg-rose-500/20 text-rose-300'
                           : log.action === 'RESOLVE'
                           ? 'bg-emerald-500/20 text-emerald-300'
+                          : log.action === 'MAINTENANCE'
+                          ? 'bg-purple-500/20 text-purple-300'
+                          : log.action === 'DM_ALERT'
+                          ? 'bg-amber-500/20 text-amber-300'
                           : 'bg-blue-500/20 text-blue-300'
                       }`}
                     >
@@ -373,12 +657,25 @@ export const AdminCockpitView: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modals */}
       <CreateIncidentModal
-        isOpen={isModalOpen}
+        isOpen={isIncidentModalOpen}
         components={components}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => setIsIncidentModalOpen(false)}
         onSubmit={onCreateIncident}
+      />
+
+      <CreateComponentModal
+        isOpen={isComponentModalOpen}
+        onClose={() => setIsComponentModalOpen(false)}
+        onSubmit={onCreateComponent}
+      />
+
+      <PostMortemModal
+        isOpen={postMortemModalData.isOpen}
+        onClose={() => setPostMortemModalData((prev) => ({ ...prev, isOpen: false }))}
+        incidentTitle={postMortemModalData.title}
+        markdown={postMortemModalData.markdown}
       />
     </div>
   );

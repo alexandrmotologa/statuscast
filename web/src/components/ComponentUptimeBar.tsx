@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Component, ComponentStatus, DailyUptime } from '../types.js';
 import { Activity, Globe } from 'lucide-react';
+import { LatencySparkline } from './LatencySparkline.js';
 
 interface Props {
   component: Component;
@@ -143,6 +144,14 @@ export const ComponentUptimeBar: React.FC<Props> = ({ component }) => {
         <div className="h-[1px] flex-1 mx-3 bg-zinc-800" />
         <span>Today ({component.uptimePercentage.toFixed(2)}%)</span>
       </div>
+
+      {/* 24-Hour Latency Sparkline */}
+      {component.latencyHistory && component.latencyHistory.length > 0 && (
+        <LatencySparkline
+          samples={component.latencyHistory}
+          averageMs={component.averageLatencyMs}
+        />
+      )}
     </div>
   );
 };

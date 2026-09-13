@@ -12,7 +12,9 @@ import { closeDatabase, getDatabase } from './db/database.js';
 import { seedDemoData } from './db/seeder.js';
 import { createAdminApiRoutes } from './routes/adminApi.js';
 import { heartbeatApiRoutes } from './routes/heartbeatApi.js';
+import { postMortemApiRoutes } from './routes/postMortemApi.js';
 import { statusApiRoutes } from './routes/statusApi.js';
+import { subscriberApiRoutes } from './routes/subscriberApi.js';
 import { monitorService } from './services/monitorService.js';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
@@ -69,6 +71,8 @@ async function bootstrap() {
   await app.register(statusApiRoutes);
   await app.register(createAdminApiRoutes(broadcaster));
   await app.register(heartbeatApiRoutes);
+  await app.register(subscriberApiRoutes);
+  await app.register(postMortemApiRoutes);
 
   // 6. Serve static web frontend if built
   const possibleWebDistPaths = [
@@ -104,20 +108,22 @@ async function bootstrap() {
   }
 
   // 7. Start listening with automatic port fallback
-  try {
-    await app.listen({ port: PORT, host: HOST });
-    console.log(`[Server] StatusCast listening on http://${HOST}:${PORT}`);
-    console.log(`[Server] Status page: ${WEBAPP_URL}/?page=demo`);
-  } catch (err: any) {
-    if (err.code === 'EADDRINUSE') {
-      const fallbackPort = PORT === 8080 ? 8085 : PORT + 1;
-      console.warn(`[Server] Port ${PORT} is in use, falling back to port ${fallbackPort}...`);
-      await app.listen({ port: fallbackPort, host: HOST });
-      console.log(`[Server] StatusCast listening on http://${HOST}:${fallbackPort}`);
-      console.log(`[Server] Status page: http://localhost:${fallbackPort}/?page=demo`);
-    } else {
-      app.log.error(err);
-      process.exit(1);
+  let listenPort = PORT;
+  let started = false;
+  while (!started && listenPort < PORT + 50) {
+    try {
+      await app.listen({ port: listenPort, host: HOST });
+      console.log(`[Server] StatusCast listening on http://${HOST}:${listenPort}`);
+      console.log(`[Server] Status page: http://localhost:${listenPort}/?page=demo`);
+      started = true;
+    } catch (err: any) {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`[Server] Port ${listenPort} is in use, trying next port...`);
+        listenPort++;
+      } else {
+        app.log.error(err);
+        process.exit(1);
+      }
     }
   }
 

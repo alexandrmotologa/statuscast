@@ -3,16 +3,27 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  addSubscriber,
   closeDatabase,
+  createComponent,
   createIncident,
+  createMaintenanceWindow,
+  deleteComponent,
   getComponents,
   getDailyUptime,
   getDatabase,
   getIncidents,
+  getMaintenanceWindows,
+  getRecentLatencySamples,
   getStatusPage,
+  getSubscribersCount,
+  isSubscribed,
   recordHeartbeat,
+  recordLatencySample,
+  removeSubscriber,
   resolveIncident,
   updateComponentStatus,
+  updateMaintenanceStatus,
 } from '../db/database.js';
 import { seedDemoData } from '../db/seeder.js';
 import { verifyTelegramInitData } from '../security/auth.js';
@@ -145,4 +156,80 @@ describe('StatusCast Database & Domain Logic', () => {
     const invalidData = validInitData + 'invalid';
     expect(verifyTelegramInitData(invalidData, mockBotToken)).toBeNull();
   });
+
+  it('should manage direct alert subscribers', () => {
+    const sub = addSubscriber('demo', 987654321, 'test_user');
+    expect(sub).toBeDefined();
+    expect(sub.telegramUserId).toBe(987654321);
+
+    expect(isSubscribed('demo', 987654321)).toBe(true);
+    expect(isSubscribed('demo', 999999999)).toBe(false);
+    expect(getSubscribersCount('demo')).toBeGreaterThanOrEqual(1);
+
+    const removed = removeSubscriber('demo', 987654321);
+    expect(removed).toBe(true);
+    expect(isSubscribed('demo', 987654321)).toBe(false);
+  });
+
+  it('should record and fetch 24h latency samples', () => {
+    recordLatencySample('comp-api', 32.5, 200);
+    recordLatencySample('comp-api', 45.1, 200);
+
+    const samples = getRecentLatencySamples('comp-api', 24);
+    expect(samples.length).toBeGreaterThanOrEqual(2);
+    const last = samples[samples.length - 1];
+    expect(last.latencyMs).toBe(45.1);
+    expect(last.statusCode).toBe(200);
+  });
+
+  it('should create, schedule and update maintenance windows', () => {
+    const now = Date.now();
+    const maint = createMaintenanceWindow({
+      pageId: 'demo',
+      title: 'Database Engine Major Upgrade',
+      description: 'Upgrading database storage engines to version 17.',
+      scheduledStart: now + 3600000,
+      scheduledEnd: now + 7200000,
+      affectedComponentIds: ['comp-db'],
+    });
+
+    expect(maint.id).toBeDefined();
+    expect(maint.status).toBe('SCHEDULED');
+
+    let list = getMaintenanceWindows('demo');
+    expect(list.some((m) => m.id === maint.id)).toBe(true);
+
+    updateMaintenanceStatus(maint.id, 'IN_PROGRESS');
+    const dbComp = getComponents('demo').find((c) => c.id === 'comp-db');
+    expect(dbComp?.status).toBe('MAINTENANCE');
+
+    updateMaintenanceStatus(maint.id, 'COMPLETED');
+    const dbCompRestored = getComponents('demo').find((c) => c.id === 'comp-db');
+    expect(dbCompRestored?.status).toBe('OPERATIONAL');
+  });
+
+  it('should create and delete components via admin CRUD', () => {
+    const newComp = createComponent({
+      pageId: 'demo',
+      name: 'Search & Analytics Engine',
+      groupName: 'Search Services',
+      pingUrl: 'http://localhost:8080/health',
+    });
+
+    expect(newComp.id).toBeDefined();
+    expect(newComp.name).toBe('Search & Analytics Engine');
+
+    let all = getComponents('demo');
+    expect(all.some((c) => c.id === newComp.id)).toBe(true);
+
+    const history = getDailyUptime(newComp.id, 90);
+    expect(history.length).toBe(90);
+
+    const deleted = deleteComponent(newComp.id);
+    expect(deleted).toBe(true);
+
+    all = getComponents('demo');
+    expect(all.some((c) => c.id === newComp.id)).toBe(false);
+  });
 });
+

@@ -243,3 +243,116 @@ POST /api/heartbeat/:componentId
   "status": "OPERATIONAL"
 }
 ```
+
+---
+
+## Direct Alerts & Subscriptions
+
+### 1. Subscribe User
+Registers a Telegram user ID to receive direct incident push alerts.
+
+```http
+POST /api/subscriptions/subscribe
+```
+
+#### Request Body
+```json
+{
+  "pageId": "demo",
+  "telegramUserId": 123456789,
+  "telegramUsername": "alexander"
+}
+```
+
+#### Response `200 OK`
+```json
+{
+  "success": true,
+  "subscribed": true,
+  "subscriber": {
+    "id": "sub-demo-123456789",
+    "pageId": "demo",
+    "telegramUserId": 123456789,
+    "createdAt": 1773495000000
+  },
+  "totalSubscribers": 42
+}
+```
+
+### 2. Unsubscribe User
+```http
+POST /api/subscriptions/unsubscribe
+```
+
+---
+
+## Scheduled Maintenance
+
+### 1. Schedule Maintenance Window
+Requires admin authentication. Broadcasts advance warning to the Telegram channel and alerts subscribers.
+
+```http
+POST /api/maintenance
+```
+
+#### Request Body
+```json
+{
+  "pageId": "demo",
+  "title": "Core Router Upgrade",
+  "description": "Upgrading core switch firmware to patch security CVE.",
+  "scheduledStart": 1773595000000,
+  "scheduledEnd": 1773602200000,
+  "affectedComponentIds": ["comp-api"]
+}
+```
+
+### 2. Update Maintenance Status
+```http
+PATCH /api/maintenance/:id
+```
+
+---
+
+## Component Management (CRUD)
+
+### 1. Create Component
+```http
+POST /api/components
+```
+
+#### Request Body
+```json
+{
+  "pageId": "demo",
+  "name": "Search Engine",
+  "groupName": "Data Services",
+  "pingUrl": "https://search.example.com/health"
+}
+```
+
+### 2. Delete Component
+```http
+DELETE /api/components/:id
+```
+
+---
+
+## Post-Mortem Reports
+
+### Generate Incident Post-Mortem
+Retrieves a markdown post-mortem report summarizing duration, timeline, affected services, and preventative action items.
+
+```http
+GET /api/incidents/:id/post-mortem
+```
+
+#### Response `200 OK`
+```json
+{
+  "success": true,
+  "incidentId": "inc-demo-resolved",
+  "markdown": "# Incident Post-Mortem: ...",
+  "durationMinutes": 45
+}
+```

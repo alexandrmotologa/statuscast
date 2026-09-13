@@ -13,12 +13,22 @@ export type IncidentStatus =
 
 export type IncidentSeverity = 'MINOR' | 'MAJOR' | 'CRITICAL';
 
+export type MaintenanceStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
+
 export interface StatusPage {
   id: string;
   ownerTelegramId: number;
   title: string;
   channelId?: string;
   createdAt: number;
+}
+
+export interface LatencySample {
+  id: string;
+  componentId: string;
+  timestamp: number;
+  latencyMs: number;
+  statusCode: number;
 }
 
 export interface Component {
@@ -64,9 +74,35 @@ export interface Incident {
   affectedComponentIds: string[];
 }
 
+export interface Subscriber {
+  id: string;
+  pageId: string;
+  telegramUserId: number;
+  username?: string;
+  createdAt: number;
+}
+
+export interface MaintenanceWindow {
+  id: string;
+  pageId: string;
+  title: string;
+  description: string;
+  scheduledStart: number;
+  scheduledEnd: number;
+  status: MaintenanceStatus;
+  createdAt: number;
+  affectedComponentIds: string[];
+}
+
 export interface StatusPageResponse {
   page: StatusPage;
   overallStatus: ComponentStatus;
-  components: (Component & { uptimeHistory: DailyUptime[] })[];
+  components: (Component & {
+    uptimeHistory: DailyUptime[];
+    latencyHistory?: LatencySample[];
+    averageLatencyMs?: number;
+  })[];
   incidents: Incident[];
+  maintenances?: MaintenanceWindow[];
+  subscribersCount?: number;
 }

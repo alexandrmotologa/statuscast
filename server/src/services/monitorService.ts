@@ -1,4 +1,5 @@
-import { getDatabase, updateComponentStatus } from '../db/database.js';
+import { performance } from 'node:perf_hooks';
+import { getDatabase, recordLatencySample, updateComponentStatus } from '../db/database.js';
 
 export class MonitorService {
   private intervalTimer: NodeJS.Timeout | null = null;
@@ -41,6 +42,7 @@ export class MonitorService {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const startTime = performance.now();
 
           const res = await fetch(comp.ping_url, {
             method: 'GET',
@@ -48,6 +50,7 @@ export class MonitorService {
             headers: { 'User-Agent': 'StatusCast-HealthCheck/1.0' },
           });
           clearTimeout(timeoutId);
+          const latencyMs = Math.round(performance.now() - startTime);
 
           if (res.ok) {
             this.failureCounts.set(comp.id, 0);
@@ -55,10 +58,15 @@ export class MonitorService {
               Date.now(),
               comp.id
             );
+
+            // Record latency sample for 24h sparklines
+            recordLatencySample(comp.id, latencyMs, res.status);
           } else {
+            recordLatencySample(comp.id, latencyMs, res.status);
             this.handleFailure(comp.id, comp.name, comp.status, `HTTP ${res.status}`);
           }
         } catch (err: any) {
+          recordLatencySample(comp.id, 5000, 0);
           this.handleFailure(comp.id, comp.name, comp.status, err.message);
         }
       }

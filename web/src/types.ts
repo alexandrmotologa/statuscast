@@ -13,6 +13,8 @@ export type IncidentStatus =
 
 export type IncidentSeverity = 'MINOR' | 'MAJOR' | 'CRITICAL';
 
+export type MaintenanceStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
+
 export interface StatusPage {
   id: string;
   ownerTelegramId: number;
@@ -30,6 +32,14 @@ export interface DailyUptime {
   incidentCount: number;
 }
 
+export interface LatencySample {
+  id: string;
+  componentId: string;
+  timestamp: number;
+  latencyMs: number;
+  statusCode: number;
+}
+
 export interface Component {
   id: string;
   pageId: string;
@@ -42,6 +52,8 @@ export interface Component {
   lastPingAt?: number;
   heartbeatToken?: string;
   uptimeHistory: DailyUptime[];
+  latencyHistory?: LatencySample[];
+  averageLatencyMs?: number;
 }
 
 export interface IncidentUpdate {
@@ -65,11 +77,33 @@ export interface Incident {
   affectedComponentIds: string[];
 }
 
+export interface MaintenanceWindow {
+  id: string;
+  pageId: string;
+  title: string;
+  description: string;
+  scheduledStart: number;
+  scheduledEnd: number;
+  status: MaintenanceStatus;
+  createdAt: number;
+  affectedComponentIds: string[];
+}
+
+export interface Subscriber {
+  id: string;
+  pageId: string;
+  telegramUserId: number;
+  username?: string;
+  createdAt: number;
+}
+
 export interface StatusPageResponse {
   page: StatusPage;
   overallStatus: ComponentStatus;
   components: Component[];
   incidents: Incident[];
+  maintenances?: MaintenanceWindow[];
+  subscribersCount?: number;
 }
 
 export interface BroadcastLogItem {
@@ -77,8 +111,9 @@ export interface BroadcastLogItem {
   incidentId: string;
   channelId: string;
   messageId: number;
-  action: 'POST' | 'EDIT' | 'RESOLVE';
+  action: 'POST' | 'EDIT' | 'RESOLVE' | 'MAINTENANCE' | 'DM_ALERT';
   text: string;
   timestamp: number;
   simulated: boolean;
+  subscribersNotified?: number;
 }

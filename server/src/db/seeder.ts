@@ -197,4 +197,51 @@ export function seedDemoData(): void {
   db.prepare(
     'INSERT INTO incident_affected_components (incident_id, component_id) VALUES (?, ?)'
   ).run(resolvedIncId, 'comp-db');
+
+  // 6. Seed 24h Latency Samples for Monitored Components
+  const insertLatency = db.prepare(
+    `INSERT INTO latency_samples (id, component_id, timestamp, latency_ms, status_code)
+     VALUES (?, ?, ?, ?, 200)`
+  );
+
+  for (let h = 24; h >= 0; h--) {
+    const timestamp = now - h * 60 * 60 * 1000;
+    // comp-api: typical 20-38ms with occasional small bump
+    const apiLat = 22 + Math.sin(h * 0.5) * 6 + (h === 2 ? 15 : 0) + Math.random() * 4;
+    insertLatency.run(`lat-api-${h}`, 'comp-api', timestamp, Math.round(apiLat));
+
+    // comp-web: typical 40-70ms
+    const webLat = 48 + Math.cos(h * 0.4) * 12 + Math.random() * 6;
+    insertLatency.run(`lat-web-${h}`, 'comp-web', timestamp, Math.round(webLat));
+  }
+
+  // 7. Seed Scheduled Maintenance Window
+  const maintId = 'maint-demo-01';
+  const tomorrow = now + 24 * 60 * 60 * 1000;
+  db.prepare(
+    `INSERT INTO maintenance_windows (id, page_id, title, description, scheduled_start, scheduled_end, status, created_at)
+     VALUES (?, 'demo', ?, ?, ?, ?, 'SCHEDULED', ?)`
+  ).run(
+    maintId,
+    'Core Switch Firmware Upgrade & Redundancy Test',
+    'Rolling firmware upgrade of internal data center switches. Automatic failover will prevent downtime, but momentary latency increases up to 100ms may be observed.',
+    tomorrow,
+    tomorrow + 2 * 60 * 60 * 1000,
+    now - 12 * 60 * 60 * 1000
+  );
+
+  db.prepare(
+    'INSERT INTO maintenance_affected_components (maintenance_id, component_id) VALUES (?, ?)'
+  ).run(maintId, 'comp-api');
+
+  db.prepare(
+    'INSERT INTO maintenance_affected_components (maintenance_id, component_id) VALUES (?, ?)'
+  ).run(maintId, 'comp-db');
+
+  // 8. Seed Demo Subscriber
+  db.prepare(
+    `INSERT INTO subscribers (id, page_id, telegram_user_id, username, created_at)
+     VALUES (?, 'demo', ?, ?, ?)`
+  ).run('sub-demo-1', 123456789, 'alexander_dev', now - 86400000);
 }
+

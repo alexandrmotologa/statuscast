@@ -3,7 +3,10 @@ import {
   getComponents,
   getDailyUptime,
   getIncidents,
+  getMaintenanceWindows,
+  getRecentLatencySamples,
   getStatusPage,
+  getSubscribersCount,
 } from '../db/database.js';
 import { ComponentStatus, StatusPageResponse } from '../types.js';
 
@@ -21,12 +24,28 @@ export async function statusApiRoutes(fastify: FastifyInstance): Promise<void> {
 
       const components = getComponents(pageId);
       const incidents = getIncidents(pageId, 14);
+      const maintenances = getMaintenanceWindows(pageId);
+      const subscribersCount = getSubscribersCount(pageId);
 
-      // Fetch 90-day uptime history for each component
-      const componentsWithHistory = components.map((c) => ({
-        ...c,
-        uptimeHistory: getDailyUptime(c.id, 90),
-      }));
+      // Fetch 90-day uptime history & 24h latency for each component
+      const componentsWithHistory = components.map((c) => {
+        const uptimeHistory = getDailyUptime(c.id, 90);
+        const latencyHistory = getRecentLatencySamples(c.id, 24);
+        const avgLat =
+          latencyHistory.length > 0
+            ? Math.round(
+                latencyHistory.reduce((acc, curr) => acc + curr.latencyMs, 0) /
+                  latencyHistory.length
+              )
+            : undefined;
+
+        return {
+          ...c,
+          uptimeHistory,
+          latencyHistory,
+          averageLatencyMs: avgLat,
+        };
+      });
 
       // Calculate overall system status
       let overallStatus: ComponentStatus = 'OPERATIONAL';
@@ -56,6 +75,8 @@ export async function statusApiRoutes(fastify: FastifyInstance): Promise<void> {
         overallStatus,
         components: componentsWithHistory,
         incidents,
+        maintenances,
+        subscribersCount,
       };
 
       return reply.send(response);

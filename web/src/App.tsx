@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Shield, Sparkles, Send } from 'lucide-react';
+import { Bell, Send, Shield, Sparkles } from 'lucide-react';
+import { SubscribeModal } from './components/SubscribeModal.js';
 import { useStatusData } from './hooks/useStatusData.js';
 import { useTelegram } from './hooks/useTelegram.js';
 import { AdminCockpitView } from './views/AdminCockpitView.js';
@@ -9,8 +10,9 @@ export function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const pageId = urlParams.get('page') || 'demo';
 
-  const { initData, isTelegramWebApp, hapticFeedback } = useTelegram();
+  const { initData, isTelegramWebApp, hapticFeedback, user: telegramUser } = useTelegram();
   const [viewMode, setViewMode] = useState<'public' | 'admin'>('public');
+  const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
   const [adminSecret, setAdminSecret] = useState<string>(
     localStorage.getItem('statuscast_admin_secret') || ''
   );
@@ -24,8 +26,16 @@ export function App() {
     refetch,
     fetchBroadcastLogs,
     updateComponent,
+    createComponent,
+    deleteComponent,
     createNewIncident,
     updateIncident,
+    scheduleMaintenance,
+    updateMaintenance,
+    fetchPostMortem,
+    subscribeAlerts,
+    unsubscribeAlerts,
+    checkSubscription,
   } = useStatusData(pageId, initData, adminSecret);
 
   useEffect(() => {
@@ -48,6 +58,11 @@ export function App() {
   const handleBackToPublic = () => {
     hapticFeedback.impact('light');
     setViewMode('public');
+  };
+
+  const handleOpenSubscribe = () => {
+    hapticFeedback.impact('light');
+    setIsSubscribeModalOpen(true);
   };
 
   return (
@@ -73,13 +88,26 @@ export function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenSubscribe}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all active:scale-95"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Alerts</span>
+              {data?.subscribersCount !== undefined && data.subscribersCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-[10px] font-mono">
+                  {data.subscribersCount}
+                </span>
+              )}
+            </button>
+
             {isTelegramWebApp ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
                 <Send className="w-3 h-3" />
                 Telegram App
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-zinc-800/80 text-zinc-400 font-mono">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-zinc-800/80 text-zinc-400 font-mono">
                 <Sparkles className="w-3 h-3 text-emerald-400" />
                 Standalone
               </span>
@@ -116,22 +144,42 @@ export function App() {
               onRefresh={refetch}
               loading={loading}
               onOpenAdmin={handleOpenAdmin}
+              onOpenSubscribe={handleOpenSubscribe}
             />
           ) : (
             <AdminCockpitView
               components={data.components}
               incidents={data.incidents}
+              maintenances={data.maintenances}
               broadcastLogs={broadcastLogs}
+              subscribersCount={data.subscribersCount}
               adminSecret={adminSecret}
               onUpdateAdminSecret={setAdminSecret}
               onUpdateComponent={updateComponent}
+              onCreateComponent={createComponent}
+              onDeleteComponent={deleteComponent}
               onCreateIncident={createNewIncident}
               onUpdateIncident={updateIncident}
+              onScheduleMaintenance={scheduleMaintenance}
+              onUpdateMaintenance={updateMaintenance}
+              onFetchPostMortem={fetchPostMortem}
               onBackToPublic={handleBackToPublic}
             />
           )
         ) : null}
       </main>
+
+      {/* Subscriber Modal */}
+      <SubscribeModal
+        isOpen={isSubscribeModalOpen}
+        onClose={() => setIsSubscribeModalOpen(false)}
+        telegramUser={telegramUser}
+        pageId={pageId}
+        totalSubscribers={data?.subscribersCount}
+        onSubscribe={subscribeAlerts}
+        onUnsubscribe={unsubscribeAlerts}
+        onCheckStatus={checkSubscription}
+      />
     </div>
   );
 }

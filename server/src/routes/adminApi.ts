@@ -2,16 +2,26 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { broadcastHistory, ChannelBroadcaster } from '../bot/broadcaster.js';
 import {
   addIncidentUpdate,
+  createComponent,
   createIncident,
+  createMaintenanceWindow,
+  deleteComponent,
   getComponents,
   getDatabase,
   getIncidents,
+  getMaintenanceWindows,
   resolveIncident,
   setIncidentChannelMessageId,
   updateComponentStatus,
+  updateMaintenanceStatus,
 } from '../db/database.js';
 import { adminAuthMiddleware } from '../security/auth.js';
-import { ComponentStatus, IncidentSeverity, IncidentStatus } from '../types.js';
+import {
+  ComponentStatus,
+  IncidentSeverity,
+  IncidentStatus,
+  MaintenanceStatus,
+} from '../types.js';
 
 interface UpdateComponentRoute {
   Params: { id: string };
@@ -21,6 +31,20 @@ interface UpdateComponentRoute {
     groupName?: string;
     pingUrl?: string;
   };
+}
+
+interface CreateComponentRoute {
+  Body: {
+    pageId: string;
+    name: string;
+    groupName?: string;
+    pingUrl?: string;
+    heartbeatToken?: string;
+  };
+}
+
+interface DeleteComponentRoute {
+  Params: { id: string };
 }
 
 interface CreateIncidentRoute {
@@ -39,6 +63,24 @@ interface UpdateIncidentRoute {
     status: IncidentStatus;
     message?: string;
     resolved?: boolean;
+  };
+}
+
+interface CreateMaintenanceRoute {
+  Body: {
+    pageId: string;
+    title: string;
+    description: string;
+    scheduledStart: number;
+    scheduledEnd: number;
+    affectedComponentIds?: string[];
+  };
+}
+
+interface UpdateMaintenanceRoute {
+  Params: { id: string };
+  Body: {
+    status: MaintenanceStatus;
   };
 }
 
@@ -65,7 +107,43 @@ export function createAdminApiRoutes(broadcaster: ChannelBroadcaster) {
       }
     );
 
-    // 2. Create Incident & Broadcast
+    // 2. Create Component (CRUD)
+    fastify.post<CreateComponentRoute>(
+      '/api/components',
+      { preHandler: adminAuthMiddleware },
+      async (request, reply) => {
+        const { pageId, name, groupName, pingUrl, heartbeatToken } = request.body;
+        if (!pageId || !name) {
+          return reply.code(400).send({ error: 'Missing pageId or name' });
+        }
+
+        const component = createComponent({
+          pageId,
+          name,
+          groupName,
+          pingUrl,
+          heartbeatToken,
+        });
+
+        return reply.code(201).send({ success: true, component });
+      }
+    );
+
+    // 3. Delete Component (CRUD)
+    fastify.delete<DeleteComponentRoute>(
+      '/api/components/:id',
+      { preHandler: adminAuthMiddleware },
+      async (request, reply) => {
+        const { id } = request.params;
+        const deleted = deleteComponent(id);
+        if (!deleted) {
+          return reply.code(404).send({ error: 'Component not found' });
+        }
+        return reply.send({ success: true, deletedId: id });
+      }
+    );
+
+    // 4. Create Incident & Broadcast
     fastify.post<CreateIncidentRoute>(
       '/api/incidents',
       { preHandler: adminAuthMiddleware },
@@ -111,7 +189,7 @@ export function createAdminApiRoutes(broadcaster: ChannelBroadcaster) {
       }
     );
 
-    // 3. Add Incident Update or Resolve
+    // 5. Add Incident Update or Resolve
     fastify.patch<UpdateIncidentRoute>(
       '/api/incidents/:id',
       { preHandler: adminAuthMiddleware },
@@ -180,7 +258,58 @@ export function createAdminApiRoutes(broadcaster: ChannelBroadcaster) {
       }
     );
 
-    // 4. Retrieve Broadcast History
+    // 6. Schedule Maintenance Window & Broadcast
+    fastify.post<CreateMaintenanceRoute>(
+      '/api/maintenance',
+      { preHandler: adminAuthMiddleware },
+      async (request, reply) => {
+        const { pageId, title, description, scheduledStart, scheduledEnd, affectedComponentIds } =
+          request.body;
+
+        if (!pageId || !title || !scheduledStart || !scheduledEnd) {
+          return reply.code(400).send({
+            error: 'Missing required fields for scheduled maintenance',
+          });
+        }
+
+        const maint = createMaintenanceWindow({
+          pageId,
+          title,
+          description: description || '',
+          scheduledStart,
+          scheduledEnd,
+          affectedComponentIds,
+        });
+
+        const allComponents = getComponents(pageId);
+        const affectedNames = allComponents
+          .filter((c) => affectedComponentIds?.includes(c.id))
+          .map((c) => c.name);
+
+        await broadcaster.broadcastMaintenance(maint, affectedNames);
+
+        return reply.code(201).send({ success: true, maintenance: maint });
+      }
+    );
+
+    // 7. Update Maintenance Window Status
+    fastify.patch<UpdateMaintenanceRoute>(
+      '/api/maintenance/:id',
+      { preHandler: adminAuthMiddleware },
+      async (request, reply) => {
+        const { id } = request.params;
+        const { status } = request.body;
+
+        if (!status) {
+          return reply.code(400).send({ error: 'Missing status' });
+        }
+
+        updateMaintenanceStatus(id, status);
+        return reply.send({ success: true, id, status });
+      }
+    );
+
+    // 8. Retrieve Broadcast History
     fastify.get(
       '/api/admin/broadcast-logs',
       { preHandler: adminAuthMiddleware },

@@ -9,7 +9,11 @@ import {
   IncidentSeverity,
   IncidentStatus,
   IncidentUpdate,
+  LatencySample,
+  MaintenanceStatus,
+  MaintenanceWindow,
   StatusPage,
+  Subscriber,
 } from '../types.js';
 
 let dbInstance: DatabaseSync | null = null;
@@ -108,6 +112,45 @@ function initSchema(db: DatabaseSync): void {
       FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE,
       UNIQUE(component_id, date)
     );
+
+    CREATE TABLE IF NOT EXISTS subscribers (
+      id TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      telegram_user_id INTEGER NOT NULL,
+      username TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE,
+      UNIQUE(page_id, telegram_user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS latency_samples (
+      id TEXT PRIMARY KEY,
+      component_id TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      latency_ms REAL NOT NULL,
+      status_code INTEGER NOT NULL,
+      FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS maintenance_windows (
+      id TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      scheduled_start INTEGER NOT NULL,
+      scheduled_end INTEGER NOT NULL,
+      status TEXT DEFAULT 'SCHEDULED',
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS maintenance_affected_components (
+      maintenance_id TEXT NOT NULL,
+      component_id TEXT NOT NULL,
+      PRIMARY KEY (maintenance_id, component_id),
+      FOREIGN KEY (maintenance_id) REFERENCES maintenance_windows(id) ON DELETE CASCADE,
+      FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE
+    );
   `);
 }
 
@@ -152,6 +195,66 @@ export function getComponents(pageId: string): Component[] {
   }));
 }
 
+export function createComponent(params: {
+  pageId: string;
+  name: string;
+  groupName?: string;
+  pingUrl?: string;
+  heartbeatToken?: string;
+}): Component {
+  const db = getDatabase();
+  const id = `comp-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`;
+  const countRow = db
+    .prepare('SELECT COUNT(*) as count FROM components WHERE page_id = ?')
+    .get(params.pageId) as any;
+  const orderIndex = (countRow?.count || 0) + 1;
+  const now = Date.now();
+
+  db.prepare(
+    `INSERT INTO components (id, page_id, name, group_name, status, order_index, uptime_percentage, ping_url, last_ping_at, heartbeat_token)
+     VALUES (?, ?, ?, ?, 'OPERATIONAL', ?, 100.0, ?, ?, ?)`
+  ).run(
+    id,
+    params.pageId,
+    params.name,
+    params.groupName || 'Services',
+    orderIndex,
+    params.pingUrl ?? null,
+    now,
+    params.heartbeatToken || `token_${id}`
+  );
+
+  // Seed initial 90-day 100% history
+  const insertUptime = db.prepare(
+    `INSERT INTO uptime_daily (id, component_id, date, uptime_pct, outage_minutes, incident_count)
+     VALUES (?, ?, ?, 100.0, 0, 0)`
+  );
+
+  for (let i = 89; i >= 0; i--) {
+    const dateStr = new Date(now - i * 86400000).toISOString().split('T')[0];
+    insertUptime.run(`upt-${id}-${dateStr}`, id, dateStr);
+  }
+
+  return {
+    id,
+    pageId: params.pageId,
+    name: params.name,
+    groupName: params.groupName || 'Services',
+    status: 'OPERATIONAL',
+    orderIndex,
+    uptimePercentage: 100.0,
+    pingUrl: params.pingUrl,
+    lastPingAt: now,
+    heartbeatToken: params.heartbeatToken || `token_${id}`,
+  };
+}
+
+export function deleteComponent(componentId: string): boolean {
+  const db = getDatabase();
+  const res = db.prepare('DELETE FROM components WHERE id = ?').run(componentId);
+  return res.changes > 0;
+}
+
 export function getDailyUptime(componentId: string, limitDays = 90): DailyUptime[] {
   const db = getDatabase();
   const rows = db
@@ -160,7 +263,6 @@ export function getDailyUptime(componentId: string, limitDays = 90): DailyUptime
     )
     .all(componentId, limitDays) as any[];
 
-  // Return chronological order (oldest to newest for the 90-day bar)
   return rows.reverse().map((r) => ({
     id: r.id,
     componentId: r.component_id,
@@ -268,7 +370,6 @@ export function createIncident(params: {
     for (const compId of params.affectedComponentIds) {
       insertAffected.run(id, compId);
 
-      // Auto-set component status based on incident severity if needed
       const compStatus: ComponentStatus =
         params.severity === 'CRITICAL' ? 'MAJOR_OUTAGE' : 'DEGRADED';
       updateComponentStatus(compId, compStatus);
@@ -345,7 +446,6 @@ export function resolveIncident(
     ).run(updateId, incidentId, finalMessage, now);
   }
 
-  // Restore affected components to OPERATIONAL if no other active incident affects them
   const affected = db
     .prepare('SELECT component_id FROM incident_affected_components WHERE incident_id = ?')
     .all(incidentId) as any[];
@@ -380,4 +480,199 @@ export function recordHeartbeat(componentId: string): boolean {
     .prepare('UPDATE components SET last_ping_at = ?, status = ? WHERE id = ?')
     .run(now, 'OPERATIONAL', componentId);
   return res.changes > 0;
+}
+
+// Latency Samples DAO
+export function recordLatencySample(
+  componentId: string,
+  latencyMs: number,
+  statusCode = 200
+): void {
+  const db = getDatabase();
+  const id = `lat-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+  db.prepare(
+    `INSERT INTO latency_samples (id, component_id, timestamp, latency_ms, status_code)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, componentId, Date.now(), latencyMs, statusCode);
+}
+
+export function getRecentLatencySamples(componentId: string, hours = 24): LatencySample[] {
+  const db = getDatabase();
+  const cutoff = Date.now() - hours * 60 * 60 * 1000;
+  const rows = db
+    .prepare(
+      `SELECT id, component_id, timestamp, latency_ms, status_code 
+       FROM latency_samples 
+       WHERE component_id = ? AND timestamp >= ? 
+       ORDER BY timestamp ASC`
+    )
+    .all(componentId, cutoff) as any[];
+
+  return rows.map((r) => ({
+    id: r.id,
+    componentId: r.component_id,
+    timestamp: Number(r.timestamp),
+    latencyMs: Number(r.latency_ms),
+    statusCode: Number(r.status_code),
+  }));
+}
+
+// Subscribers DAO
+export function addSubscriber(
+  pageId: string,
+  telegramUserId: number,
+  username?: string
+): Subscriber {
+  const db = getDatabase();
+  const id = `sub-${pageId}-${telegramUserId}`;
+  const now = Date.now();
+
+  db.prepare(
+    `INSERT INTO subscribers (id, page_id, telegram_user_id, username, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(page_id, telegram_user_id) DO UPDATE SET username = excluded.username`
+  ).run(id, pageId, telegramUserId, username ?? null, now);
+
+  return { id, pageId, telegramUserId, username, createdAt: now };
+}
+
+export function removeSubscriber(pageId: string, telegramUserId: number): boolean {
+  const db = getDatabase();
+  const res = db
+    .prepare('DELETE FROM subscribers WHERE page_id = ? AND telegram_user_id = ?')
+    .run(pageId, telegramUserId);
+  return res.changes > 0;
+}
+
+export function isSubscribed(pageId: string, telegramUserId: number): boolean {
+  const db = getDatabase();
+  const row = db
+    .prepare('SELECT id FROM subscribers WHERE page_id = ? AND telegram_user_id = ?')
+    .get(pageId, telegramUserId);
+  return Boolean(row);
+}
+
+export function getSubscribers(pageId: string): Subscriber[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      'SELECT id, page_id, telegram_user_id, username, created_at FROM subscribers WHERE page_id = ?'
+    )
+    .all(pageId) as any[];
+
+  return rows.map((r) => ({
+    id: r.id,
+    pageId: r.page_id,
+    telegramUserId: Number(r.telegram_user_id),
+    username: r.username ?? undefined,
+    createdAt: Number(r.created_at),
+  }));
+}
+
+export function getSubscribersCount(pageId: string): number {
+  const db = getDatabase();
+  const row = db
+    .prepare('SELECT COUNT(*) as cnt FROM subscribers WHERE page_id = ?')
+    .get(pageId) as any;
+  return row ? Number(row.cnt) : 0;
+}
+
+// Maintenance Windows DAO
+export function createMaintenanceWindow(params: {
+  pageId: string;
+  title: string;
+  description: string;
+  scheduledStart: number;
+  scheduledEnd: number;
+  affectedComponentIds?: string[];
+}): MaintenanceWindow {
+  const db = getDatabase();
+  const id = `maint-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+  const now = Date.now();
+
+  db.prepare(
+    `INSERT INTO maintenance_windows (id, page_id, title, description, scheduled_start, scheduled_end, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?)`
+  ).run(
+    id,
+    params.pageId,
+    params.title,
+    params.description,
+    params.scheduledStart,
+    params.scheduledEnd,
+    now
+  );
+
+  if (params.affectedComponentIds && params.affectedComponentIds.length > 0) {
+    const insertAffected = db.prepare(
+      'INSERT INTO maintenance_affected_components (maintenance_id, component_id) VALUES (?, ?)'
+    );
+    for (const compId of params.affectedComponentIds) {
+      insertAffected.run(id, compId);
+    }
+  }
+
+  return {
+    id,
+    pageId: params.pageId,
+    title: params.title,
+    description: params.description,
+    scheduledStart: params.scheduledStart,
+    scheduledEnd: params.scheduledEnd,
+    status: 'SCHEDULED',
+    createdAt: now,
+    affectedComponentIds: params.affectedComponentIds || [],
+  };
+}
+
+export function getMaintenanceWindows(pageId: string): MaintenanceWindow[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT id, page_id, title, description, scheduled_start, scheduled_end, status, created_at
+       FROM maintenance_windows 
+       WHERE page_id = ? AND status != 'COMPLETED'
+       ORDER BY scheduled_start ASC`
+    )
+    .all(pageId) as any[];
+
+  return rows.map((r) => {
+    const affected = db
+      .prepare('SELECT component_id FROM maintenance_affected_components WHERE maintenance_id = ?')
+      .all(r.id) as any[];
+
+    return {
+      id: r.id,
+      pageId: r.page_id,
+      title: r.title,
+      description: r.description,
+      scheduledStart: Number(r.scheduled_start),
+      scheduledEnd: Number(r.scheduled_end),
+      status: r.status as MaintenanceStatus,
+      createdAt: Number(r.created_at),
+      affectedComponentIds: affected.map((a) => a.component_id),
+    };
+  });
+}
+
+export function updateMaintenanceStatus(id: string, status: MaintenanceStatus): void {
+  const db = getDatabase();
+  db.prepare('UPDATE maintenance_windows SET status = ? WHERE id = ?').run(status, id);
+
+  // If in progress, mark affected components as MAINTENANCE
+  if (status === 'IN_PROGRESS') {
+    const affected = db
+      .prepare('SELECT component_id FROM maintenance_affected_components WHERE maintenance_id = ?')
+      .all(id) as any[];
+    for (const a of affected) {
+      updateComponentStatus(a.component_id, 'MAINTENANCE');
+    }
+  } else if (status === 'COMPLETED') {
+    const affected = db
+      .prepare('SELECT component_id FROM maintenance_affected_components WHERE maintenance_id = ?')
+      .all(id) as any[];
+    for (const a of affected) {
+      updateComponentStatus(a.component_id, 'OPERATIONAL');
+    }
+  }
 }

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Shield, ExternalLink, SlidersHorizontal } from 'lucide-react';
+import { Bell, ExternalLink, Shield, SlidersHorizontal } from 'lucide-react';
 import { ComponentUptimeBar } from '../components/ComponentUptimeBar.js';
 import { IncidentTimeline } from '../components/IncidentTimeline.js';
+import { MaintenanceBanner } from '../components/MaintenanceBanner.js';
 import { OverallStatusBanner } from '../components/OverallStatusBanner.js';
 import { StatusPageResponse } from '../types.js';
 
@@ -11,6 +12,7 @@ interface Props {
   onRefresh: () => void;
   loading: boolean;
   onOpenAdmin: () => void;
+  onOpenSubscribe: () => void;
 }
 
 export const PublicStatusView: React.FC<Props> = ({
@@ -19,6 +21,7 @@ export const PublicStatusView: React.FC<Props> = ({
   onRefresh,
   loading,
   onOpenAdmin,
+  onOpenSubscribe,
 }) => {
   // Group components by groupName
   const groupedComponents = data.components.reduce<Record<string, typeof data.components>>(
@@ -41,13 +44,38 @@ export const PublicStatusView: React.FC<Props> = ({
         loading={loading}
       />
 
+      {/* Scheduled Maintenance Banner (if any) */}
+      {data.maintenances && data.maintenances.length > 0 && (
+        <MaintenanceBanner maintenances={data.maintenances} components={data.components} />
+      )}
+
       {/* Services List Grouped */}
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-            System Components
-          </h2>
-          <span className="text-xs text-zinc-500">90-Day Uptime History</span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              System Components
+            </h2>
+            <span className="text-[10px] text-zinc-500 font-mono">
+              ({data.components.length} Monitored)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onOpenSubscribe}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all active:scale-95"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>Get Alerts</span>
+              {data.subscribersCount !== undefined && data.subscribersCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-[10px]">
+                  {data.subscribersCount}
+                </span>
+              )}
+            </button>
+            <span className="text-xs text-zinc-500 hidden sm:inline">90-Day Uptime</span>
+          </div>
         </div>
 
         {Object.entries(groupedComponents).map(([groupName, comps]) => (
@@ -75,6 +103,14 @@ export const PublicStatusView: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={onOpenSubscribe}
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            <Bell className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Direct DM Alerts</span>
+          </button>
+
           {data.page.channelId && (
             <a
               href={`https://t.me/${data.page.channelId.replace('@', '')}`}

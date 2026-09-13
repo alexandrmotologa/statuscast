@@ -1,15 +1,17 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import { Incident, IncidentSeverity, IncidentStatus } from '../types.js';
+import { getSubscribers } from '../db/database.js';
+import { Incident, MaintenanceWindow } from '../types.js';
 
 export interface BroadcastLogItem {
   id: string;
   incidentId: string;
   channelId: string;
   messageId: number;
-  action: 'POST' | 'EDIT' | 'RESOLVE';
+  action: 'POST' | 'EDIT' | 'RESOLVE' | 'MAINTENANCE' | 'DM_ALERT';
   text: string;
   timestamp: number;
   simulated: boolean;
+  subscribersNotified?: number;
 }
 
 // In-memory log of recent channel broadcasts (viewable in Admin Cockpit)
@@ -40,12 +42,15 @@ export class ChannelBroadcaster {
       `${this.webAppUrl}/?page=${incident.pageId}`
     );
 
+    let messageId: number | undefined;
+
     if (this.bot && this.bot.token && !this.bot.token.startsWith('mock_')) {
       try {
         const msg = await this.bot.api.sendMessage(this.channelId, text, {
           reply_markup: keyboard,
           parse_mode: 'HTML',
         });
+        messageId = msg.message_id;
 
         this.recordLog({
           incidentId: incident.id,
@@ -55,25 +60,27 @@ export class ChannelBroadcaster {
           text,
           simulated: false,
         });
-
-        return msg.message_id;
       } catch (err) {
         console.warn('[Broadcaster] Telegram sendMessage failed, recording simulation:', err);
       }
     }
 
-    // Fallback simulation mode
-    const simulatedMsgId = Math.floor(1000 + Math.random() * 9000);
-    this.recordLog({
-      incidentId: incident.id,
-      channelId: this.channelId,
-      messageId: simulatedMsgId,
-      action: 'POST',
-      text,
-      simulated: true,
-    });
+    if (!messageId) {
+      messageId = Math.floor(1000 + Math.random() * 9000);
+      this.recordLog({
+        incidentId: incident.id,
+        channelId: this.channelId,
+        messageId,
+        action: 'POST',
+        text,
+        simulated: true,
+      });
+    }
 
-    return simulatedMsgId;
+    // Direct alerts to registered subscribers
+    await this.notifySubscribers(incident, text);
+
+    return messageId;
   }
 
   public async updateIncidentMessage(
@@ -102,22 +109,21 @@ export class ChannelBroadcaster {
           text,
           simulated: false,
         });
-
-        return true;
       } catch (err) {
         console.warn('[Broadcaster] Telegram editMessageText failed:', err);
       }
+    } else {
+      this.recordLog({
+        incidentId: incident.id,
+        channelId: this.channelId,
+        messageId,
+        action: 'EDIT',
+        text,
+        simulated: true,
+      });
     }
 
-    this.recordLog({
-      incidentId: incident.id,
-      channelId: this.channelId,
-      messageId,
-      action: 'EDIT',
-      text,
-      simulated: true,
-    });
-
+    await this.notifySubscribers(incident, text);
     return true;
   }
 
@@ -148,23 +154,103 @@ export class ChannelBroadcaster {
           text,
           simulated: false,
         });
-
-        return true;
       } catch (err) {
         console.warn('[Broadcaster] Telegram resolve editMessageText failed:', err);
+      }
+    } else {
+      this.recordLog({
+        incidentId: incident.id,
+        channelId: this.channelId,
+        messageId,
+        action: 'RESOLVE',
+        text,
+        simulated: true,
+      });
+    }
+
+    await this.notifySubscribers(incident, text);
+    return true;
+  }
+
+  public async broadcastMaintenance(
+    maint: MaintenanceWindow,
+    affectedNames: string[]
+  ): Promise<number> {
+    const startDate = new Date(maint.scheduledStart).toUTCString();
+    const endDate = new Date(maint.scheduledEnd).toUTCString();
+    const affected = affectedNames.length > 0 ? affectedNames.join(', ') : 'All Infrastructure';
+
+    const text =
+      `🛠️ <b>[SCHEDULED MAINTENANCE] ${escapeHtml(maint.title)}</b>\n\n` +
+      `<b>Window:</b> <code>${startDate}</code> – <code>${endDate}</code>\n` +
+      `<b>Affected Services:</b> ${escapeHtml(affected)}\n\n` +
+      `<i>${escapeHtml(maint.description)}</i>`;
+
+    const keyboard = new InlineKeyboard().url(
+      '📊 View Live Status Page',
+      `${this.webAppUrl}/?page=${maint.pageId}`
+    );
+
+    let messageId = Math.floor(1000 + Math.random() * 9000);
+
+    if (this.bot && this.bot.token && !this.bot.token.startsWith('mock_')) {
+      try {
+        const msg = await this.bot.api.sendMessage(this.channelId, text, {
+          reply_markup: keyboard,
+          parse_mode: 'HTML',
+        });
+        messageId = msg.message_id;
+      } catch (err) {
+        console.warn('[Broadcaster] Failed to broadcast maintenance:', err);
       }
     }
 
     this.recordLog({
-      incidentId: incident.id,
+      incidentId: maint.id,
       channelId: this.channelId,
       messageId,
-      action: 'RESOLVE',
+      action: 'MAINTENANCE',
       text,
-      simulated: true,
+      simulated: !Boolean(this.bot && this.bot.token && !this.bot.token.startsWith('mock_')),
     });
 
-    return true;
+    return messageId;
+  }
+
+  private async notifySubscribers(incident: Incident, alertText: string): Promise<void> {
+    const subscribers = getSubscribers(incident.pageId);
+    if (subscribers.length === 0) return;
+
+    let notifiedCount = 0;
+    const isLive = Boolean(this.bot && this.bot.token && !this.bot.token.startsWith('mock_'));
+
+    if (isLive && this.bot) {
+      for (const sub of subscribers) {
+        try {
+          await this.bot.api.sendMessage(
+            sub.telegramUserId,
+            `🔔 <b>StatusCast Personal Alert</b>\n\n${alertText}`,
+            { parse_mode: 'HTML' }
+          );
+          notifiedCount++;
+        } catch (err) {
+          // Ignore failed DMs to individual users (e.g. blocked bot)
+        }
+      }
+    } else {
+      notifiedCount = subscribers.length;
+    }
+
+    this.recordLog({
+      incidentId: incident.id,
+      channelId: `DM Alerts (${subscribers.length} subscribers)`,
+      messageId: 0,
+      action: 'DM_ALERT',
+      text: `Sent DM notification to ${notifiedCount} registered subscriber(s).`,
+      timestamp: Date.now(),
+      simulated: !isLive,
+      subscribersNotified: notifiedCount,
+    });
   }
 
   private formatIncidentMessage(incident: Incident, affectedNames: string[]): string {
@@ -218,11 +304,11 @@ export class ChannelBroadcaster {
     );
   }
 
-  private recordLog(item: Omit<BroadcastLogItem, 'id' | 'timestamp'>): void {
+  private recordLog(item: Omit<BroadcastLogItem, 'id' | 'timestamp'> & { timestamp?: number }): void {
     broadcastHistory.unshift({
       ...item,
       id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: Date.now(),
+      timestamp: item.timestamp || Date.now(),
     });
 
     if (broadcastHistory.length > 50) {
