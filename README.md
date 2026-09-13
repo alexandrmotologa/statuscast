@@ -1,6 +1,56 @@
-# StatusCast
+<p align="center">
+  <img src="docs/images/logo.png?raw=true" alt="StatusCast Logo" width="140" style="border-radius: 24px;" />
+</p>
 
-StatusCast is an open-source status page and incident broadcaster for Telegram. It runs a status page inside a Telegram Mini App and automatically posts incident updates to a Telegram broadcast channel, editing existing messages in place as incidents progress and resolve.
+<h1 align="center">StatusCast</h1>
+
+<p align="center">
+  <b>Telegram Mini App Status Page & In-Place Broadcast Channel Incident Telemetry</b>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Telegram-Mini_App-0088cc?logo=telegram&logoColor=white" alt="Telegram Mini App" />
+  <img src="https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Fastify-5.2-black?logo=fastify&logoColor=white" alt="Fastify" />
+  <img src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white" alt="SQLite WAL" />
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License" />
+</p>
+
+<p align="center">
+  StatusCast replaces third-party status page subscriptions with a self-hosted Telegram Mini App and an automated incident broadcaster for Telegram channels. When incidents occur, updates and resolutions edit the original channel announcement in place, keeping public feeds clean while notifying subscribers directly.
+</p>
+
+<p align="center">
+  <img src="docs/images/statuscast-demo.gif" alt="StatusCast Interactive Demo" width="850" style="border-radius: 12px; border: 1px solid #30363d;" />
+</p>
+
+---
+
+## Visual Showcase
+
+| Public Status Page (Latency Sparklines & Maintenance) | Direct Bot DM Alerts Modal |
+| :---: | :---: |
+| <img src="docs/images/public-status.png" width="460" alt="Public Status Page" /> | <img src="docs/images/subscribe-modal.png" width="460" alt="Direct Alerts Modal" /> |
+
+| Admin Cockpit (Component State Switcher & In-Place Updates) | Automated Incident Post-Mortem Report |
+| :---: | :---: |
+| <img src="docs/images/admin-cockpit.png" width="460" alt="Admin Cockpit" /> | <img src="docs/images/post-mortem-modal.png" width="460" alt="Post-Mortem Report" /> |
+
+---
+
+## Brand Mascot: The Radar Osprey
+
+StatusCast is represented by the **Radar Osprey** (*Pandion Observator*). 
+
+In nature, the osprey maintains an unblinking gaze over vast expanses of water, detecting subtle movement beneath turbulent surfaces without losing flight stability. StatusCast brings that same relentless vigilance to modern infrastructure: tracking millisecond latency shifts 24/7, catching silent regressions, and broadcasting coordinated telemetry the instant degradation occurs.
+
+The emblem follows disciplined Swiss origami geometry:
+- **Electric Cyan Optics (`#00f5ff`)**: Active ping probes, real-time response telemetry, and instant Telegram alert delivery.
+- **Obsidian & Slate Facets (`#0b0f19` — `#475569`)**: Structural resilience backed by zero-dependency native SQLite WAL persistence.
+- **Titanium Amber Hook (`#fbbf24`)**: Instant incident triage and swift root-cause resolution.
+
+---
 
 ## Core Features
 
