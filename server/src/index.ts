@@ -103,14 +103,22 @@ async function bootstrap() {
     console.log('[Bootstrap] No static web dist directory found. Running API-only mode.');
   }
 
-  // 7. Start listening
+  // 7. Start listening with automatic port fallback
   try {
     await app.listen({ port: PORT, host: HOST });
     console.log(`[Server] StatusCast listening on http://${HOST}:${PORT}`);
     console.log(`[Server] Status page: ${WEBAPP_URL}/?page=demo`);
-  } catch (err) {
-    app.log.error(err);
-    process.exit(1);
+  } catch (err: any) {
+    if (err.code === 'EADDRINUSE') {
+      const fallbackPort = PORT === 8080 ? 8085 : PORT + 1;
+      console.warn(`[Server] Port ${PORT} is in use, falling back to port ${fallbackPort}...`);
+      await app.listen({ port: fallbackPort, host: HOST });
+      console.log(`[Server] StatusCast listening on http://${HOST}:${fallbackPort}`);
+      console.log(`[Server] Status page: http://localhost:${fallbackPort}/?page=demo`);
+    } else {
+      app.log.error(err);
+      process.exit(1);
+    }
   }
 
   // Graceful shutdown handling
@@ -124,9 +132,16 @@ async function bootstrap() {
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  process.on('uncaughtException', (err) => {
+    console.error('[Server] Uncaught Exception:', err);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[Server] Unhandled Rejection:', reason);
+  });
 }
 
 bootstrap().catch((err) => {
   console.error('[Bootstrap] Fatal startup error:', err);
   process.exit(1);
 });
+
